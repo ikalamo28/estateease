@@ -1,26 +1,30 @@
 "use client";
 import {useState, useEffect} from 'react'
 import { useRouter } from 'next/navigation'
-import {getRedirectResult, signInWithRedirect} from 'firebase/auth'
-import {auth, gooleProvider} from '../../lib/firebase'
+import {auth, googleProvider} from "@/lib/firebase";
 import React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import {getRedirectResult, signInWithRedirect, signInWithPopup} from 'firebase/auth'
+
+const useRedirectFlow = process.env.NODE_ENV === "production";
+
 
 const signup = () => {
   const [agreed, setAgreed] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, isLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
+    if (!useRedirectFlow) return;
     
     let mounted = true;
 
     async function handleRedirectResult() {
       try {
         const result = await getRedirectResult(auth);
-        if (mounted) return;
+        if (!mounted) return;
         if (result?.user) {
           router.replace('/dashboard');
         }
@@ -29,8 +33,8 @@ const signup = () => {
         if(!mounted) return;
 
         const message = err instanceof Error ? err.message : "google sign in failed"
-        setError(message)
-        setLoading(false)
+        setError(message);
+        isLoading(false);
       }
     }
 
@@ -42,18 +46,26 @@ const signup = () => {
   }, [router])
 
   async function handleGoogleSignIn() {
-    setError(null);
-    setLoading(true);
+    setError(null); 
+    isLoading(true);
 
     try {
-      await signInWithRedirect(auth, gooleProvider);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "google sign in failed"
-      setError(message)
-      setLoading(false)
-    }
-  }
+      const result = await signInWithPopup(auth, googleProvider)
+      if (result.user) {
+        console.log(result.user.email)
 
+        await auth.currentUser?.getIdToken
+
+        router.replace("/dashboard")
+      } 
+
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "unable to connect with google";
+      setError(message);
+      isLoading(false);
+    }
+
+  }
   return (
     <div> 
       <div className='pl-10 bg-amber-700 pt-20'> 
